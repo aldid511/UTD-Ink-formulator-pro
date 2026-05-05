@@ -1,0 +1,84 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InkFormulator Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Remove spin buttons for all number inputs */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        @media print {
+            @page {
+                margin: 1cm;
+                size: portrait;
+            }
+            body {
+                background: white !important;
+            }
+            /* Hide everything that isn't the active printable result */
+            .no-print {
+                display: none !important;
+            }
+            /* Helper to ensure the result panel takes the whole page */
+            .print-full-page {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                background-color: white !important;
+                color: black !important;
+                padding: 1.5cm !important;
+                margin: 0 !important;
+                z-index: 9999 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            .print-full-page * {
+                color: black !important;
+                border-color: #e2e8f0 !important;
+            }
+            /* Specifically for the result panel backgrounds in print */
+            .print-full-page .bg-slate-800, 
+            .print-full-page .bg-slate-800\/50,
+            .print-full-page .bg-slate-900 {
+                background-color: #f8fafc !important;
+                border: 1px solid #e2e8f0 !important;
+            }
+            /* Ensure the text is readable */
+            .print-full-page .text-blue-400,
+            .print-full-page .text-emerald-400 {
+                color: #2563eb !important; /* Solid blue for print */
+                font-weight: 800 !important;
+            }
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
