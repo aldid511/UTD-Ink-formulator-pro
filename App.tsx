@@ -96,6 +96,11 @@ const App: React.FC = () => {
     setActiveTab(CalculationMode.SOLUBILITY);
   };
 
+  const handleExportToDilution = (content: number) => {
+    setDilutionData(prev => ({ ...prev, initialConcentration: content }));
+    setActiveTab(CalculationMode.DILUTION);
+  };
+
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'} flex flex-col items-center py-8 px-4 print:p-0 print:bg-white`}>
       <header className="max-w-4xl w-full mb-8 flex items-center justify-between print:hidden">
@@ -190,7 +195,7 @@ const App: React.FC = () => {
             <ConcentrateToCalculator state={concentrateToData} setState={setConcentrateToData} />
           )}
           {activeTab === CalculationMode.QC_SOLID && (
-            <QCSolidCalculator state={qcSolidData} setState={setQCSolidData} onExportToSolubility={handleExportToSolubility} />
+            <QCSolidCalculator state={qcSolidData} setState={setQCSolidData} onExportToSolubility={handleExportToSolubility} onExportToDilution={handleExportToDilution} />
           )}
           {activeTab === CalculationMode.SOLUBILITY && (
             <SolubilityCalculator state={solubilityData} setState={setSolubilityData} />

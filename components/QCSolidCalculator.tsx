@@ -1,16 +1,21 @@
 
 import React, { useMemo } from 'react';
 import { QCSolidState } from '../types';
-import { Scale, Beaker, AlertCircle, Info, FileText, ArrowRight } from 'lucide-react';
+import { Scale, Beaker, AlertCircle, Info, FileText, ArrowRight, Eraser, FlaskConical } from 'lucide-react';
 
 interface Props {
   state: QCSolidState;
   setState: React.Dispatch<React.SetStateAction<QCSolidState>>;
   onExportToSolubility?: (content: number) => void;
+  onExportToDilution?: (content: number) => void;
 }
 
-const QCSolidCalculator: React.FC<Props> = ({ state, setState, onExportToSolubility }) => {
+const QCSolidCalculator: React.FC<Props> = ({ state, setState, onExportToSolubility, onExportToDilution }) => {
   const { tareMass, wetMass, dryMass } = state;
+
+  const resetFields = () => {
+    setState({ tareMass: undefined, wetMass: undefined, dryMass: undefined });
+  };
 
   const preventScroll = (e: React.WheelEvent<HTMLInputElement>) => {
     e.currentTarget.blur();
@@ -56,10 +61,21 @@ const QCSolidCalculator: React.FC<Props> = ({ state, setState, onExportToSolubil
       <div className="grid md:grid-cols-2 gap-8">
         <div className="space-y-6 print:hidden">
           <section className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-sky-400 flex items-center gap-2">
-              <Scale className="w-5 h-5 text-sky-500" />
-              Gravimetric Inputs
-            </h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-sky-400 flex items-center gap-2">
+                <Scale className="w-5 h-5 text-sky-500" />
+                Gravimetric Inputs
+              </h3>
+              <button
+                onClick={resetFields}
+                disabled={tareMass === undefined && wetMass === undefined && dryMass === undefined}
+                className="flex items-center gap-1.5 text-xs font-bold bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 hover:bg-sky-200 dark:hover:bg-sky-900/60 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-md transition-all active:scale-95"
+                title="Clear all fields for a new sample"
+              >
+                <Eraser className="w-3.5 h-3.5" />
+                New Sample
+              </button>
+            </div>
             
             <div className="space-y-4 bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
               <div>
@@ -182,12 +198,20 @@ const QCSolidCalculator: React.FC<Props> = ({ state, setState, onExportToSolubil
                  </div>
 
                 <div className="flex flex-col gap-3 pt-4 border-t border-slate-800 print:hidden">
-                  <button 
+                  <button
                     onClick={() => onExportToSolubility?.(results.solidContent)}
                     className="w-full py-3 bg-sky-500 text-white font-bold rounded-xl hover:bg-sky-600 transition-colors flex items-center justify-center gap-2 shadow-lg"
                   >
                     <ArrowRight className="w-4 h-4" />
                     Export to Solubility Tab
+                  </button>
+                  <button
+                    onClick={() => onExportToDilution?.(results.solidContent)}
+                    className="w-full py-3 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 shadow-lg"
+                    title="Use this solid content as the stock concentration in Dilution/Conc"
+                  >
+                    <FlaskConical className="w-4 h-4" />
+                    Export to Dilution/Conc Tab
                   </button>
                   <button 
                     onClick={() => window.print()}

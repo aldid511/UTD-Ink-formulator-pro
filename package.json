@@ -1,8 +1,9 @@
 {
   "name": "utd-inkformulator-pro",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "UT Dots InkFormulator Pro - precision ink formulation calculators (mix, centrifuge, decant mass balance)",
   "author": "Aleksey Didenko",
   "main": "electron/main.js",
   "scripts": {
