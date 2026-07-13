@@ -98,13 +98,18 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
     const bulkToAdd = activeToAdd / (yp / 100);
     const inactiveMass = bulkToAdd - activeToAdd;
     const totalMassIncrease = tm - im;
-    // Solvent fills the remainder after weighing out the full bulk solid.
-    // Subtracting only activeToAdd would overshoot the target mass when yield < 100%.
-    const solventToAdd = totalMassIncrease - bulkToAdd;
+    // Process mass balance (SOP F056: mix -> centrifuge -> decant):
+    // the insoluble fraction of the added bulk solid is removed with the pellet,
+    // so only its soluble (active) part stays in the final ink. Solvent tops up
+    // the FINAL ink mass, not the pot charge.
+    const solventToAdd = totalMassIncrease - activeToAdd;
+    const potMass = im + bulkToAdd + solventToAdd;
 
     let error: string | null = null;
-    if (activeToAdd < 0) error = "Final state lower than initial. Use Dilution tab.";
-    else if (solventToAdd < 0) error = "Insufficient mass growth for this yield/concentration increase. Increase target mass or lower concentration.";
+    if (yp <= 0 || yp > 100) error = "Solubility must be between 0 and 100%.";
+    else if (tc >= 100) error = "Target concentration must be below 100%.";
+    else if (activeToAdd < 0) error = "Final state lower than initial. Use Dilution tab.";
+    else if (solventToAdd < 0) error = "Insufficient mass growth for this concentration increase. Increase target mass or lower concentration.";
 
     const normalizationFactor = 100 / solventTotalWt;
     const solventBreakdown = solvents.map((s, i) => ({
@@ -112,7 +117,7 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
       mass: solventToAdd * (((s.weightPercent || 0) * normalizationFactor) / 100)
     }));
     const yieldLoss = yp < 100;
-    return { isReady: true, activeToAdd, bulkToAdd, inactiveMass, solventToAdd, solventBreakdown, yieldLoss, error };
+    return { isReady: true, activeToAdd, bulkToAdd, inactiveMass, solventToAdd, potMass, solventBreakdown, yieldLoss, error };
   }, [initialMass, initialConcentration, targetMass, targetConcentration, yieldPercent, solvents, solventTotalWt]);
 
   return (
@@ -179,15 +184,22 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
               </div>
 
               <div className="col-span-2">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Solute Yield (%)</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Solubility / Yield (%)</label>
                 <input
                   type="number"
                   value={yieldPercent ?? ''}
                   onWheel={preventScroll}
                   onChange={(e) => setState(prev => ({ ...prev, yieldPercent: handleNumInput(e.target.value) }))}
-                  placeholder="100"
+                  placeholder="85"
                   className={getInputClass(yieldPercent)}
                 />
+              </div>
+              <div className="col-span-2 flex gap-2 items-start p-3 bg-sky-50 dark:bg-sky-900/10 border border-sky-100 dark:border-sky-800 rounded-lg">
+                <Info className="w-4 h-4 text-sky-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-sky-800 dark:text-sky-300">
+                  Assumes SOP F056 process: add solid + solvent, mix, centrifuge &amp; decant.
+                  The insoluble fraction of added solid is removed with the pellet.
+                </p>
               </div>
             </div>
           </section>
@@ -283,11 +295,11 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
                 {results.yieldLoss && (
                   <div className="mt-3 pt-3 border-t border-slate-700 grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-0.5">Active Fraction</span>
+                      <span className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-0.5">Dissolves (Soluble)</span>
                       <span className="font-mono text-emerald-400">{results.activeToAdd?.toFixed(3)}g</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-0.5">Inactive / Lost</span>
+                      <span className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-0.5">Insoluble (Removed)</span>
                       <span className="font-mono text-amber-400">{results.inactiveMass?.toFixed(3)}g</span>
                     </div>
                   </div>
@@ -302,6 +314,20 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
                       <span className="font-mono">{s.mass.toFixed(3)}g</span>
                     </div>
                   ))}
+                </div>
+              </div>
+              <div className="bg-slate-800 rounded-xl border border-slate-700 divide-y divide-slate-700/60 text-sm">
+                <div className="flex justify-between items-center px-4 py-2.5">
+                  <span className="text-slate-400">1. Pot charge (stock + additions)</span>
+                  <span className="font-mono text-slate-200">{results.potMass?.toFixed(3)}g</span>
+                </div>
+                <div className="flex justify-between items-center px-4 py-2.5">
+                  <span className="text-slate-400">2. Centrifuge &amp; decant (insoluble out)</span>
+                  <span className="font-mono text-amber-400">&minus;{results.inactiveMass?.toFixed(3)}g</span>
+                </div>
+                <div className="flex justify-between items-center px-4 py-2.5">
+                  <span className="text-slate-300 font-semibold">3. Final decanted ink</span>
+                  <span className="font-mono text-emerald-400 font-bold">{targetMass?.toFixed(3)}g @ {targetConcentration?.toFixed(2)}%</span>
                 </div>
               </div>
               <div className="pt-4 border-t border-slate-800 mt-auto flex justify-between">

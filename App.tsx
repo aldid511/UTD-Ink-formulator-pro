@@ -32,7 +32,7 @@ const App: React.FC = () => {
     soluteName: 'Active Solute',
     targetMass: undefined,
     targetConcentration: undefined,
-    yieldPercent: undefined,
+    yieldPercent: 85, // SOP F056: AgN solubility/yield assumed 85%
     solvents: [
       { id: '1', name: '', weightPercent: undefined, isAuto: true },
       { id: '2', name: '', weightPercent: undefined, isAuto: true },
@@ -53,7 +53,7 @@ const App: React.FC = () => {
     initialConcentration: undefined,
     adjustMode: 'ADD_SOLID',
     addedSolidMass: undefined,
-    solidYield: 100,
+    solidYield: 85, // SOP F056: AgN solubility/yield assumed 85%
     addedSolutionMass: undefined,
     addedSolutionConcentration: undefined,
     targetConcentration: undefined,
@@ -67,7 +67,7 @@ const App: React.FC = () => {
     initialConcentration: undefined,
     targetMass: undefined,
     targetConcentration: undefined,
-    yieldPercent: undefined,
+    yieldPercent: 85, // SOP F056: AgN solubility/yield assumed 85%
     solvents: [{ id: '1', name: '', weightPercent: undefined, isAuto: true }]
   });
 

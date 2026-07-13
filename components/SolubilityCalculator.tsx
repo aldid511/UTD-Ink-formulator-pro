@@ -98,8 +98,11 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
       percent: (s.weightPercent || 0) * normalizationFactor
     }));
 
-    const solubilityYield = (solidContent !== undefined && theoreticalSolidContent > 0) 
-      ? (solidContent / theoreticalSolidContent) * 100 
+    // Back-calculate the soluble fraction from the measured solid content of the
+    // decanted ink (post mix -> centrifuge -> decant, insolubles removed with pellet):
+    //   measured SC = s*B / (s*B + S)   =>   s = SC*S / (B*(100 - SC))
+    const solubilityYield = (solidContent !== undefined && soluteMass > 0 && solidContent < 100)
+      ? ((solidContent * totalSolventMass) / (soluteMass * (100 - solidContent))) * 100
       : undefined;
 
     return { 
@@ -360,7 +363,7 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
                     <div className="flex items-center justify-between pt-2 border-t border-white/10">
                       <div className="flex items-center gap-2">
                         <Zap className="w-4 h-4 text-slate-400" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Solubility Yield</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">Solubility (use in One Pot)</span>
                       </div>
                       <span className="font-mono font-bold text-sky-400">{results.solubilityYield.toFixed(2)}%</span>
                     </div>

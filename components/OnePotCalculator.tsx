@@ -84,22 +84,31 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState }) => {
 
   const results = useMemo(() => {
     if (targetMass === undefined || targetConcentration === undefined || yieldPercent === undefined || solventTotalWt === 0) {
-      return { isReady: false };
+      return { isReady: false as const };
     }
+    let error: string | null = null;
+    if (targetMass <= 0) error = "Target mass must be greater than 0.";
+    else if (yieldPercent <= 0 || yieldPercent > 100) error = "Solubility must be between 0 and 100%.";
+    else if (targetConcentration < 0 || targetConcentration >= 100) error = "Concentration must be between 0 and 100%.";
+    if (error) return { isReady: true as const, error };
+
     const concentrationDecimal = targetConcentration / 100;
     const activeSoluteNeeded = targetMass * concentrationDecimal;
     const bulkSoluteNeeded = activeSoluteNeeded / (yieldPercent / 100);
-    // Solvent fills the remainder after the full bulk solid is weighed out.
-    // Using activeSoluteNeeded here would overshoot the target mass when yield < 100%.
     const inactiveMass = bulkSoluteNeeded - activeSoluteNeeded;
-    const totalSolventMass = targetMass - bulkSoluteNeeded;
+    // Process mass balance (SOP F056: mix -> centrifuge -> decant):
+    // the insoluble fraction of the bulk solid leaves with the pellet at
+    // centrifugation, so the decanted ink = dissolved solute + all solvent.
+    // Solvent therefore tops up the FINAL ink mass, not the pot charge.
+    const totalSolventMass = targetMass - activeSoluteNeeded;
+    const potMass = bulkSoluteNeeded + totalSolventMass;
     const normalizationFactor = 100 / solventTotalWt;
     const solventBreakdown = solvents.map((s, i) => ({
       name: s.name.trim() || String.fromCharCode(65 + i),
       mass: totalSolventMass * (((s.weightPercent || 0) * normalizationFactor) / 100)
     }));
     const yieldLoss = yieldPercent < 100;
-    return { isReady: true, activeSoluteNeeded, bulkSoluteNeeded, inactiveMass, totalSolventMass, solventBreakdown, yieldLoss };
+    return { isReady: true as const, error: null, activeSoluteNeeded, bulkSoluteNeeded, inactiveMass, totalSolventMass, potMass, solventBreakdown, yieldLoss };
   }, [targetMass, targetConcentration, yieldPercent, solvents, solventTotalWt]);
 
   return (
@@ -145,16 +154,24 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Solute Yield (%)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Solubility / Yield (%)</label>
                 <input
                   type="number"
                   value={yieldPercent ?? ''}
                   onWheel={preventScroll}
                   onChange={(e) => setState(prev => ({ ...prev, yieldPercent: handleNumInput(e.target.value) }))}
-                  placeholder="100"
+                  placeholder="85"
                   className={getInputClass(yieldPercent)}
                 />
               </div>
+            </div>
+            <div className="flex gap-2 items-start p-3 bg-sky-50 dark:bg-sky-900/10 border border-sky-100 dark:border-sky-800 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-sky-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-sky-800 dark:text-sky-300">
+                One-pot process per SOP F056: mix &rarr; centrifuge &rarr; decant. The insoluble fraction
+                of the nano is removed with the pellet, so the decanted ink hits your target mass and
+                concentration.
+              </p>
             </div>
           </section>
 
@@ -228,7 +245,7 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState }) => {
           </section>
         </div>
 
-        <div className={`bg-slate-900 rounded-2xl p-6 text-white shadow-inner flex flex-col h-full min-h-[400px] ${results.isReady ? 'print-full-page' : ''}`}>
+        <div className={`bg-slate-900 rounded-2xl p-6 text-white shadow-inner flex flex-col h-full min-h-[400px] ${results.isReady && !results.error ? 'print-full-page' : ''}`}>
           <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
             <span className="bg-sky-600 p-2 rounded-lg print:hidden"><Calculator className="w-5 h-5" /></span>
             Recipe Card
@@ -238,6 +255,11 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState }) => {
             <div className="flex-grow flex flex-col items-center justify-center text-slate-500 space-y-4 border-2 border-dashed border-slate-800 rounded-2xl p-8 text-center">
               <Calculator className="w-12 h-12 opacity-20" />
               <p className="text-sm font-medium">Input recipe parameters</p>
+            </div>
+          ) : results.error ? (
+            <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-xl text-red-200 text-sm flex gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span>{results.error}</span>
             </div>
           ) : (
             <div className="space-y-6 flex-grow animate-in fade-in duration-500">
@@ -256,11 +278,11 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState }) => {
                   {results.yieldLoss && (
                     <div className="mt-3 pt-3 border-t border-slate-700 grid grid-cols-2 gap-2 text-xs">
                       <div className="text-slate-400">
-                        <span className="block text-[10px] uppercase tracking-widest font-bold mb-0.5">Active Fraction</span>
+                        <span className="block text-[10px] uppercase tracking-widest font-bold mb-0.5">Dissolves (Soluble)</span>
                         <span className="font-mono text-emerald-400">{results.activeSoluteNeeded?.toFixed(3)}g</span>
                       </div>
                       <div className="text-slate-400">
-                        <span className="block text-[10px] uppercase tracking-widest font-bold mb-0.5">Inactive / Lost</span>
+                        <span className="block text-[10px] uppercase tracking-widest font-bold mb-0.5">Insoluble (Removed)</span>
                         <span className="font-mono text-amber-400">{results.inactiveMass?.toFixed(3)}g</span>
                       </div>
                     </div>
@@ -278,24 +300,41 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState }) => {
                   ))}
                 </div>
               </div>
+              <div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Process Mass Balance</p>
+                <div className="bg-slate-800 rounded-xl border border-slate-700 divide-y divide-slate-700/60 text-sm">
+                  <div className="flex justify-between items-center px-4 py-2.5">
+                    <span className="text-slate-400">1. Pot charge (mix)</span>
+                    <span className="font-mono text-slate-200">{results.potMass?.toFixed(3)}g</span>
+                  </div>
+                  <div className="flex justify-between items-center px-4 py-2.5">
+                    <span className="text-slate-400">2. Centrifuge &amp; decant (insoluble out)</span>
+                    <span className="font-mono text-amber-400">&minus;{results.inactiveMass?.toFixed(3)}g</span>
+                  </div>
+                  <div className="flex justify-between items-center px-4 py-2.5">
+                    <span className="text-slate-300 font-semibold">3. Final decanted ink</span>
+                    <span className="font-mono text-emerald-400 font-bold">{targetMass?.toFixed(3)}g @ {targetConcentration?.toFixed(2)}%</span>
+                  </div>
+                </div>
+              </div>
               <div className="pt-4 border-t border-slate-800 flex justify-between items-end mt-auto">
                 <div>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Target Mass</p>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Final Ink Mass</p>
                   <p className="text-lg font-semibold">{targetMass?.toFixed(2)}g</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Active Conc</p>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Final Conc</p>
                   <p className="text-lg font-semibold text-emerald-400">{targetConcentration?.toFixed(2)}%</p>
                 </div>
               </div>
             </div>
           )}
 
-          <button 
-            disabled={!results.isReady}
+          <button
+            disabled={!results.isReady || !!results.error}
             onClick={() => window.print()}
             className={`mt-8 w-full py-3 font-bold rounded-xl transition-colors flex items-center justify-center gap-2 print:hidden ${
-              results.isReady ? 'bg-white text-slate-900 hover:bg-slate-200' : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+              results.isReady && !results.error ? 'bg-white text-slate-900 hover:bg-slate-200' : 'bg-slate-800 text-slate-600 cursor-not-allowed'
             }`}
           >
             Print Recipe

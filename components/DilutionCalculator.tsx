@@ -101,10 +101,13 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
         const asm = addedSolidMass as number;
         const sy = solidYield as number;
         const activePart = asm * (sy / 100);
-        finalMass += asm; 
+        // SOP F056 process: after adding solid the ink is re-mixed, centrifuged
+        // and decanted, so the insoluble fraction of the added solid is removed
+        // with the pellet. Only the soluble part stays in the final ink.
+        finalMass += activePart;
         finalActive += activePart;
         additionMassVal = asm;
-        additionDesc = `Added ${asm}g solid (${sy}% yield)`;
+        additionDesc = `Added ${asm}g bulk solid (${sy}% soluble) — mix, centrifuge & decant removes ${(asm - activePart).toFixed(3)}g insoluble`;
       } else {
         const asom = addedSolutionMass as number;
         const asoc = addedSolutionConcentration as number;
@@ -122,12 +125,17 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
       if (targetConcentration === undefined) return { isReady: false };
       const tc = targetConcentration as number;
       if (adjustMode === 'ADD_SOLID') {
-        if (solidYield === undefined || solidYield === 0) return { isReady: false };
+        if (solidYield === undefined || solidYield <= 0) return { isReady: false };
         const sy = solidYield as number;
-        if (sy <= tc) return { isReady: true, error: `Solid yield (${sy}%) must be higher than goal (${tc}%).` };
-        const ma = im * (tc - ic) / (sy - tc);
-        if (ma < 0) return { isReady: true, error: "Transformation impossible with this solid." };
-        return { isReady: true, initialMass: im, initialConcentration: ic, additionDesc: `Add ${ma.toFixed(3)}g Solid`, additionMass: ma, finalMass: im + ma, finalConcentration: tc, error: null };
+        if (sy > 100) return { isReady: true, error: "Solubility cannot exceed 100%." };
+        if (tc >= 100) return { isReady: true, error: "Goal concentration must be below 100%." };
+        // SOP F056 process: the added solid's insoluble fraction is removed at
+        // centrifuge/decant, so the net addition to the ink is pure dissolved
+        // solute of mass ma*sy. Solve (im*ic + ma*sy) / (im + ma*sy) = tc.
+        const ma = (im * (tc - ic) * 100) / (sy * (100 - tc));
+        if (ma < 0) return { isReady: true, error: "Goal is below current concentration. Use dilution instead." };
+        const dissolved = ma * (sy / 100);
+        return { isReady: true, initialMass: im, initialConcentration: ic, additionDesc: `Add ${ma.toFixed(3)}g bulk solid (${sy}% soluble) — mix, centrifuge & decant removes ${(ma - dissolved).toFixed(3)}g insoluble`, additionMass: ma, finalMass: im + dissolved, finalConcentration: tc, error: null };
       } else {
         if (backwardManualField === 'TARGET_MASS') {
           if (targetMass === undefined || targetMass <= im) return { isReady: true, error: "Target mass must exceed initial mass." };
@@ -274,15 +282,21 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
                         />
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Solid Yield (%)</label>
+                        <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Solubility / Yield (%)</label>
                         <input
                           type="number"
                           value={solidYield ?? ''}
                           onWheel={preventScroll}
                           onChange={(e) => setState(prev => ({ ...prev, solidYield: handleNumInput(e.target.value) }))}
-                          placeholder="100"
+                          placeholder="85"
                           className={getInputClass(solidYield, true)}
                         />
+                      </div>
+                      <div className="col-span-2 flex gap-2 items-start p-3 bg-sky-100/50 dark:bg-sky-900/10 border border-sky-200 dark:border-sky-800 rounded-lg">
+                        <Info className="w-3.5 h-3.5 text-sky-500 mt-0.5 shrink-0" />
+                        <p className="text-[11px] text-sky-800 dark:text-sky-300">
+                          After adding solid: mix, centrifuge &amp; decant (SOP F056 steps 4&ndash;10). The insoluble fraction is removed with the pellet.
+                        </p>
                       </div>
                     </>
                   ) : (
@@ -327,16 +341,24 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
                   </div>
                   <div className="h-px bg-slate-200 dark:bg-slate-700"></div>
                   {adjustMode === 'ADD_SOLID' ? (
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Solid Solute Yield (%)</label>
-                      <input
-                        type="number"
-                        value={solidYield ?? ''}
-                        onWheel={preventScroll}
-                        onChange={(e) => setState(prev => ({ ...prev, solidYield: handleNumInput(e.target.value) }))}
-                        placeholder="100"
-                        className={getInputClass(solidYield, true)}
-                      />
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Solubility / Yield (%)</label>
+                        <input
+                          type="number"
+                          value={solidYield ?? ''}
+                          onWheel={preventScroll}
+                          onChange={(e) => setState(prev => ({ ...prev, solidYield: handleNumInput(e.target.value) }))}
+                          placeholder="85"
+                          className={getInputClass(solidYield, true)}
+                        />
+                      </div>
+                      <div className="flex gap-2 items-start p-3 bg-sky-100/50 dark:bg-sky-900/10 border border-sky-200 dark:border-sky-800 rounded-lg">
+                        <Info className="w-3.5 h-3.5 text-sky-500 mt-0.5 shrink-0" />
+                        <p className="text-[11px] text-sky-800 dark:text-sky-300">
+                          After adding solid: mix, centrifuge &amp; decant (SOP F056 steps 4&ndash;10). The insoluble fraction is removed with the pellet.
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-4">
