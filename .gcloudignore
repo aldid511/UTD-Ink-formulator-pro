@@ -1,0 +1,10 @@
+# Keep the Cloud Build upload small — everything is rebuilt inside the container
+.git
+node_modules
+dist
+dist_electron
+electron
+build
+.env.local
+.claude
+*.exe
