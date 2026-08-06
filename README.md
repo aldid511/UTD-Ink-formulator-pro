@@ -21,8 +21,9 @@ npm run dev        # dev server at http://localhost:3000
 
 ## Deploy
 
-- **Synology NAS (RS1221RP+)** — see [DEPLOY_NAS.md](DEPLOY_NAS.md). The prebuilt app
-  ships in [`dist/`](dist); no build tools needed on the NAS.
+- **Austin RackStation (primary)** — see [DEPLOY_NAS.md](DEPLOY_NAS.md): copy
+  [`dist/`](dist) to the `websites` share, deploy the Portainer stack, app at
+  port 8081. No build tools needed on the NAS.
 - **Cloud Run** — `gcloud run deploy utd-inkformulator-pro --source . --region us-west1`
   (uses the [Dockerfile](Dockerfile)).
 - **Windows desktop (portable exe)** — `npm run electron:build` → `dist_electron/`.

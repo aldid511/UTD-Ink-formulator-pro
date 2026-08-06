@@ -1,17 +1,22 @@
-# UTD InkFormulator Pro — Synology Container Manager deployment
-# Serves the prebuilt static app in ./dist with nginx. No build step and no
-# internet access needed on the NAS (nginx:alpine image must be pulled once,
-# or imported from a .tar via Container Manager > Image > Add > From File).
+# UTD InkFormulator Pro — Portainer stack for the Electroninks Austin
+# RackStation (RS1221RP-EIAUS) web sandbox.
 #
-# Usage on the NAS: place this folder at e.g. /volume1/docker/inkformulator,
-# then Container Manager > Project > Create > select this folder.
-# App will be at http://<NAS-IP>:8080/
+# Deploy: Portainer (http://192.168.1.111:9000) > Stacks > Add stack >
+# paste this file. Prerequisite: the repo's dist/ folder copied to
+# \\192.168.1.111\websites\inkformulator\dist  (SMB, ei-web-aleksey account).
+#
+# Port 8081 is inside the 8080-8099 range reserved for this sandbox.
+# The bind mount is read-only and stays inside /volume1/websites, per the
+# sandbox ground rules (no host paths outside websites, no --privileged).
+#
+# Updating the site = replacing the files in the dist folder over SMB.
+# The bind mount is live; no container restart needed.
 services:
   inkformulator:
     image: nginx:alpine
     container_name: utd-inkformulator-pro
     ports:
-      - "8080:80"
+      - "8081:80"
     volumes:
-      - ./dist:/usr/share/nginx/html:ro
+      - /volume1/websites/inkformulator/dist:/usr/share/nginx/html:ro
     restart: unless-stopped

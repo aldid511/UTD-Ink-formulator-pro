@@ -1,79 +1,73 @@
-# Deploying UTD InkFormulator Pro on the Synology RS1221RP+
+# Deploying UTD InkFormulator Pro on the Austin RackStation (RS1221RP-EIAUS)
 
-The app is a **fully static, self-contained web app**. Everything it needs is in the
-[`dist/`](dist) folder of this repository — no internet access, database, or build
-tools are required on the NAS. (Only exception: the optional background-music button
-in the header streams from YouTube and will do nothing on a LAN-only network.)
+Deployment target is the **web sandbox** set up 2026-08-04 (see the sandbox
+design doc): site files live on the **`websites`** shared folder, and the app
+runs as an nginx container created through **Portainer**. Web Station is *not*
+used — installing DSM packages is outside the sandbox ground rules.
 
-There are two ways to host it. **Method A (Web Station) is the simplest** and uses
-DSM's built-in web server. Method B (Container Manager / Docker) isolates the app in
-a container and is preferable if the `web` share is already used for something else.
+The app itself is a **fully static, self-contained web app** — everything it
+needs is in this repo's [`dist/`](dist) folder. No internet access is required
+at runtime. (Only exception: the optional background-music button in the header
+streams from YouTube and silently does nothing on a LAN-only network.)
 
----
+## Prerequisites
 
-## Method A — Web Station (recommended)
+- The `ei-web-aleksey` DSM and Portainer accounts (see the handoff doc —
+  **change both passwords first if you haven't**; that doc was sent with
+  passwords in plaintext and must never be committed to this repo).
+- Access to the Austin LAN (`192.168.1.111`) or the electroninks tailnet
+  (`100.91.87.103` — substitute it in every URL below when remote).
 
-1. **Install Web Station**: DSM → Package Center → search "Web Station" → Install.
-   When prompted for a back-end, install **nginx** (Apache also works).
-   Installing Web Station creates a shared folder named **`web`** on volume 1.
-2. **Copy the app**: create a folder `inkformulator` inside the `web` share and copy
-   the **contents of `dist/`** into it (via File Station drag-and-drop, or over SMB:
-   `\\<NAS-IP>\web\inkformulator\`). You should end up with:
-   ```
-   /volume1/web/inkformulator/index.html
-   /volume1/web/inkformulator/assets/index-*.js
-   /volume1/web/inkformulator/assets/index-*.css
-   ```
-3. **Open the app**: browse to `http://<NAS-IP>/inkformulator/`
-   The app uses relative asset paths, so it works from any subfolder without
-   further Web Station configuration.
-4. *(Optional)* **Friendly URL / HTTPS**: DSM → Control Panel → Login Portal →
-   Advanced → Reverse Proxy lets you map e.g. `https://ink.yourdomain.local` to the
-   folder above. Not required for LAN use.
+## Step 1 — copy the app to the websites share
 
-**Updating to a new version**: replace the contents of `web/inkformulator/` with the
-new `dist/` contents. Users may need a hard refresh (Ctrl+F5).
+Mount the share over SMB (Windows: map `\\192.168.1.111\websites` as a network
+drive; macOS: ⌘K → `smb://192.168.1.111/websites`), then copy this repo's
+`dist` folder so you end up with:
 
----
+```
+websites/inkformulator/dist/index.html
+websites/inkformulator/dist/assets/index-*.js
+websites/inkformulator/dist/assets/index-*.css
+```
 
-## Method B — Container Manager (Docker)
+(File Station at `http://192.168.1.111:5000` works too for one-off uploads.)
 
-Works on the RS1221RP+ (AMD Ryzen V1500B, x86_64 — standard `linux/amd64` images run natively).
+## Step 2 — create the Portainer stack
 
-1. **Install Container Manager**: DSM → Package Center → "Container Manager" → Install
-   (this creates the `docker` shared folder).
-2. **Copy this repository folder** (at minimum `docker-compose.yml` and `dist/`) to
-   `/volume1/docker/inkformulator/` (File Station or SMB).
-3. **Create the project**: Container Manager → Project → Create →
-   - Project name: `inkformulator`
-   - Path: `/volume1/docker/inkformulator`
-   - Source: *Use existing docker-compose.yml*
-   → Next → Done. Container Manager pulls `nginx:alpine` (~4 MB) and starts the app.
-   - *If the NAS has no internet access*: on any machine with Docker run
-     `docker pull nginx:alpine && docker save nginx:alpine -o nginx-alpine.tar`,
-     copy the tar to the NAS, and import it via Container Manager → Image → Add →
-     From File before creating the project.
-4. **Open the app**: `http://<NAS-IP>:8080/`
-   To use a different port, change the left-hand side of `"8080:80"` in
-   `docker-compose.yml`.
-5. If DSM's firewall is enabled, allow the chosen port: Control Panel → Security →
-   Firewall → Edit Rules.
+1. Portainer: `http://192.168.1.111:9000`, log in as `ei-web-aleksey`.
+2. **Stacks → Add stack**, name it `inkformulator`.
+3. Paste the contents of [docker-compose.yml](docker-compose.yml) into the web
+   editor and **Deploy the stack**. Portainer pulls `nginx:alpine` (~4 MB).
 
-**Updating to a new version**: replace the `dist/` folder and restart the project
-(Container Manager → Project → `inkformulator` → Action → Restart). The container
-serves the folder read-only, so a restart is only needed to clear nginx's file cache.
+The compose file binds `/volume1/websites/inkformulator/dist` read-only into
+the container and publishes port **8081** (inside the 8080–8099 range reserved
+for this sandbox). It follows the sandbox ground rules: no host paths outside
+`/volume1/websites`, no `--privileged`.
 
----
+## Step 3 — open the app
 
-## Notes for IT
+- Austin LAN: **http://192.168.1.111:8081**
+- Tailnet: **http://100.91.87.103:8081**
 
-- **App type**: single-page static app (React, prebuilt). No server-side code, no
-  external calls at runtime, no data leaves the browser. Recipes are computed
-  client-side; nothing is stored on the NAS.
-- **Browser support**: any modern Chromium/Firefox/Edge. No IE.
-- **Printing**: recipe cards print via the browser; the print stylesheet is
-  black-on-white regardless of theme.
-- **Source & rebuild**: `npm ci && npm run build` regenerates `dist/` from source
-  (Node 20+). Not needed for deployment — `dist/` in this repo is the release build.
-- **Versioning**: this repo tags releases (`v1.0.0`, ...). The version deployed to
-  the NAS is whatever `dist/` contents you copy; check the git tag you cloned.
+Update the InkFormulator link in SOP F056 (step PRE-2) to this address when
+retiring the Cloud Run URL.
+
+## Updating to a new version
+
+Replace the contents of `websites/inkformulator/dist/` with the new `dist/`
+from this repo. The bind mount is live — no container restart needed. Users may
+need a hard refresh (Ctrl+F5) to drop cached assets.
+
+## Notes
+
+- **Do not** bind ports outside 8080–8099. In particular 80/443/5000/5001
+  (DSM), 9000/9443 (Portainer), and 5566 (replication) are taken.
+- **Backups**: the `websites` folder replicates offsite nightly at 01:10 with
+  30-day immutable snapshots, so the deployed app is covered — but the source
+  of truth is this git repo.
+- **App type** (for IT review): single-page static app, prebuilt React. No
+  server-side code, no external calls at runtime, nothing stored on the NAS;
+  all calculations run in the browser.
+- **Rebuilding from source**: `npm ci && npm run build` (Node 20+) regenerates
+  `dist/`. Not needed for deployment — `dist/` in this repo is the release
+  build (tagged, e.g. `v1.0.0`).
