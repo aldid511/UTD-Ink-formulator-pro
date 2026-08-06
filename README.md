@@ -10,6 +10,9 @@ the requested final ink mass and concentration after decanting.
 The app is a fully self-contained static site: no internet access needed at runtime
 (styling, fonts, and libraries are all bundled).
 
+> **Deploying to the Austin RackStation?** Start with [HANDOFF.md](HANDOFF.md),
+> then [DEPLOY_NAS.md](DEPLOY_NAS.md) for the steps.
+
 ## Run locally
 
 Prerequisites: Node.js 20+
