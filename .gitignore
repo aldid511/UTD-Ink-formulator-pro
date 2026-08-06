@@ -8,7 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# dist is committed on purpose: it is the prebuilt release the NAS serves
 dist-ssr
 dist_electron
 build

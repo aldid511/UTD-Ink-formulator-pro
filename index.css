@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Arctic Frost typography (theme-factory): DejaVu Sans with local fallbacks.
+   No web fonts — the app must run on a LAN-only NAS without internet. */
+body {
+  font-family: 'DejaVu Sans', Verdana, 'Segoe UI', Arial, sans-serif;
+}
+
+/* Remove spin buttons for all number inputs */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+@media print {
+  @page {
+    margin: 1cm;
+    size: portrait;
+  }
+  body {
+    background: white !important;
+  }
+  /* Hide everything that isn't the active printable result */
+  .no-print {
+    display: none !important;
+  }
+  /* Helper to ensure the result panel takes the whole page */
+  .print-full-page {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background-color: white !important;
+    color: black !important;
+    padding: 1.5cm !important;
+    margin: 0 !important;
+    z-index: 9999 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .print-full-page * {
+    color: black !important;
+    border-color: #e2e8f0 !important;
+  }
+  /* Specifically for the result panel backgrounds in print */
+  .print-full-page .bg-slate-800,
+  .print-full-page .bg-slate-800\/50,
+  .print-full-page .bg-slate-900 {
+    background-color: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+  /* Ensure the text is readable */
+  .print-full-page .text-blue-400,
+  .print-full-page .text-emerald-400 {
+    color: #2563eb !important; /* Solid blue for print */
+    font-weight: 800 !important;
+  }
+}

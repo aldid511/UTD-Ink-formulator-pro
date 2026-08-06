@@ -1,0 +1,17 @@
+# UTD InkFormulator Pro — Synology Container Manager deployment
+# Serves the prebuilt static app in ./dist with nginx. No build step and no
+# internet access needed on the NAS (nginx:alpine image must be pulled once,
+# or imported from a .tar via Container Manager > Image > Add > From File).
+#
+# Usage on the NAS: place this folder at e.g. /volume1/docker/inkformulator,
+# then Container Manager > Project > Create > select this folder.
+# App will be at http://<NAS-IP>:8080/
+services:
+  inkformulator:
+    image: nginx:alpine
+    container_name: utd-inkformulator-pro
+    ports:
+      - "8080:80"
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+    restart: unless-stopped

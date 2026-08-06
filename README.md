@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# UTD InkFormulator Pro
 
-# Run and deploy your AI Studio app
+Precision formulation calculators for UT Dots silver nanoparticle inks (SOP F055/F056).
+All tabs model the one-pot process — **mix → centrifuge → decant** — where the insoluble
+fraction of the nano (default solubility 85%) is removed with the pellet, so recipes hit
+the requested final ink mass and concentration after decanting.
 
-This contains everything you need to run your app locally.
+**Tabs**: One Pot · Solvents · Dilution/Conc · Conc To · QC Solid · Solubility
 
-View your app in AI Studio: https://ai.studio/apps/drive/1VDijjz52G8mG4wsPZEQdtBlvgMtCEAhj
+The app is a fully self-contained static site: no internet access needed at runtime
+(styling, fonts, and libraries are all bundled).
 
-## Run Locally
+## Run locally
 
-**Prerequisites:**  Node.js
+Prerequisites: Node.js 20+
 
+```
+npm install
+npm run dev        # dev server at http://localhost:3000
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Deploy
+
+- **Synology NAS (RS1221RP+)** — see [DEPLOY_NAS.md](DEPLOY_NAS.md). The prebuilt app
+  ships in [`dist/`](dist); no build tools needed on the NAS.
+- **Cloud Run** — `gcloud run deploy utd-inkformulator-pro --source . --region us-west1`
+  (uses the [Dockerfile](Dockerfile)).
+- **Windows desktop (portable exe)** — `npm run electron:build` → `dist_electron/`.
+
+## Build from source
+
+```
+npm ci
+npm run build      # regenerates dist/
+```
