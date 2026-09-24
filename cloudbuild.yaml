@@ -1,0 +1,55 @@
+# Continuous deployment
+#   GitHub (ElectroninksInc/UTDInkFormulatorPro, branch main)
+#     -> Cloud Build trigger "AutoPush"
+#       -> Cloud Run service "utd-inkformulator-pro" (us-west1)
+#
+# Why this file exists: the trigger runs in autodetect mode, which derives the
+# container image name from the GitHub repo name. "UTDInkFormulatorPro" and
+# "ElectroninksInc" contain uppercase letters, and Docker image references must
+# be lowercase, so every autodetected build failed at validation with
+# "could not parse reference". Pinning an explicit lowercase image name here
+# fixes that, and adds the deploy step that autodetect does not provide.
+#
+# Cloud Build prefers this file over Dockerfile autodetection, so no change to
+# the trigger itself is required.
+
+steps:
+  # 1. Build the image (multi-stage: npm build -> nginx serving dist/)
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - us-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/utd-inkformulator-pro:$COMMIT_SHA
+      - -t
+      - us-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/utd-inkformulator-pro:latest
+      - .
+
+  # 2. Push both tags
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - us-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/utd-inkformulator-pro
+
+  # 3. Deploy the freshly built image to Cloud Run
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - utd-inkformulator-pro
+      - --image=us-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/utd-inkformulator-pro:$COMMIT_SHA
+      - --region=us-west1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --quiet
+
+# Required: the trigger runs as a user-specified service account
+# (696345316889-compute), which forces an explicit logging mode.
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1200s
