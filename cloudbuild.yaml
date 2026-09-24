@@ -14,6 +14,40 @@
 # the trigger itself is required.
 
 steps:
+  # 0. Guard: the committed dist/ must match what the source compiles to.
+  #
+  # dist/ is committed on purpose so the Synology NAS can serve the app with
+  # no build tools. That means the repo holds two representations of the app:
+  # the source, and a compiled snapshot of it. Cloud Run rebuilds from source
+  # (below) and is therefore always current, but the NAS copies the committed
+  # dist/ verbatim. If someone edits source and pushes without running
+  # `npm run build`, the NAS would silently keep serving the OLD calculations
+  # while Cloud Run serves the new ones -- the same commit giving two
+  # different answers. This step fails the build instead.
+  - id: verify-dist-in-sync
+    name: node:22-alpine
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -e
+        cp -r dist /tmp/dist-committed
+        npm ci --silent
+        npm run build
+        if diff -r /tmp/dist-committed dist > /tmp/drift.txt 2>&1; then
+          echo "OK: committed dist/ matches the source."
+        else
+          echo "=============================================================="
+          echo "ERROR: committed dist/ is STALE - it does not match the source."
+          echo ""
+          cat /tmp/drift.txt
+          echo ""
+          echo "Deploying now would leave the NAS serving outdated files."
+          echo "Fix locally:   npm run build && git add dist && git commit --amend --no-edit && git push --force-with-lease"
+          echo "=============================================================="
+          exit 1
+        fi
+
   # 1. Build the image (multi-stage: npm build -> nginx serving dist/)
   - id: build
     name: gcr.io/cloud-builders/docker
