@@ -46,6 +46,8 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState, mode }) => {
 
   // Preset mode: the goal is one of the standard ink concentrations. Measured
   // values (stock concentration, masses) stay free entry in both modes.
+  // The select keeps dark text even when unset, because the native popup list
+  // inherits the control's colour and greying it greys every option.
   const goalConcSelect = (
     <select
       value={state.targetConcentration ?? ''}
@@ -53,7 +55,11 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState, mode }) => {
         ...prev,
         targetConcentration: e.target.value === '' ? undefined : parseFloat(e.target.value)
       }))}
-      className={getInputClass(state.targetConcentration, true)}
+      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all font-bold text-slate-900 ${
+        state.targetConcentration === undefined
+          ? 'bg-white border-slate-300 focus:ring-sky-500'
+          : 'bg-yellow-100 border-yellow-400 focus:ring-yellow-500'
+      }`}
     >
       {/* Options carry their own colour so they do not inherit a greyed-out
           placeholder colour from the select. */}

@@ -53,13 +53,13 @@ export const ConcentrationPicker: React.FC<{
 }> = ({ value, onChange, system, label = 'Concentration' }) => (
   <div>
     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">{label}</label>
+    {/* The select keeps dark text even when unset: the native popup list
+        inherits the control's colour, so greying it greys every option. */}
     <select
       value={value ?? ''}
       onChange={e => onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all font-bold ${
-        value === undefined
-          ? 'bg-white border-slate-300 text-slate-400'
-          : 'bg-white border-slate-400 text-slate-900'
+      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all font-bold bg-white text-slate-900 ${
+        value === undefined ? 'border-slate-300' : 'border-slate-400'
       }`}
     >
       {/* Options carry their own colour: without it they inherit the grey
