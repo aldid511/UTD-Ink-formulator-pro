@@ -62,11 +62,13 @@ export const ConcentrationPicker: React.FC<{
           : 'bg-white border-slate-400 text-slate-900'
       }`}
     >
-      <option value="">Select…</option>
+      {/* Options carry their own colour: without it they inherit the grey
+          placeholder text colour from the select and render washed out. */}
+      <option value="" className="text-slate-900">Select…</option>
       {PRESET_CONCENTRATIONS.map(c => {
         const name = system ? getInkName(c, system) : undefined;
         return (
-          <option key={c} value={c}>
+          <option key={c} value={c} className="text-slate-900">
             {c}%{name ? ` — ${name}` : ''}
           </option>
         );

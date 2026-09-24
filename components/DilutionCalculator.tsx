@@ -55,9 +55,11 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState, mode }) => {
       }))}
       className={getInputClass(state.targetConcentration, true)}
     >
-      <option value="">Select…</option>
+      {/* Options carry their own colour so they do not inherit a greyed-out
+          placeholder colour from the select. */}
+      <option value="" className="text-slate-900">Select…</option>
       {PRESET_CONCENTRATIONS.map(c => (
-        <option key={c} value={c}>{c}%</option>
+        <option key={c} value={c} className="text-slate-900">{c}%</option>
       ))}
     </select>
   );
