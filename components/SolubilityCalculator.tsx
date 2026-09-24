@@ -1,9 +1,9 @@
 
 import React, { useMemo } from 'react';
-import { SolventComponent, SolubilityState, FormulationMode } from '../types';
+import { SolventComponent, SolubilityState, SolubilityIteration, FormulationMode } from '../types';
 import { presetSolvents } from '../presets';
 import { SolventSystemPicker } from './PresetControls';
-import { Plus, Trash2, Calculator, Beaker, Droplet, RefreshCw, Eraser, FileText, Calendar, Tag, User, Hash, Zap } from 'lucide-react';
+import { Plus, Trash2, Calculator, Beaker, Droplet, RefreshCw, Eraser, FileText, Calendar, Tag, User, Hash, Zap, Layers } from 'lucide-react';
 
 interface Props {
   state: SolubilityState;
@@ -17,6 +17,7 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState, mode }) => {
     totalSolventMass,
     solvents,
     solventSystem,
+    iterations,
     solidContent,
     lotNumber,
     chemicalName,
@@ -27,6 +28,27 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState, mode }) => {
 
   const preventScroll = (e: React.WheelEvent<HTMLInputElement>) => {
     e.currentTarget.blur();
+  };
+
+  const addIteration = () => {
+    setState(prev => ({
+      ...prev,
+      iterations: [
+        ...prev.iterations,
+        { id: Date.now().toString(), soluteAdded: undefined, solventAdded: undefined, solidContent: undefined }
+      ]
+    }));
+  };
+
+  const removeIteration = (id: string) => {
+    setState(prev => ({ ...prev, iterations: prev.iterations.filter(it => it.id !== id) }));
+  };
+
+  const updateIteration = (id: string, field: keyof SolubilityIteration, value: number | undefined) => {
+    setState(prev => ({
+      ...prev,
+      iterations: prev.iterations.map(it => (it.id === id ? { ...it, [field]: value } : it))
+    }));
   };
 
   const handleNumInput = (val: string) => {
@@ -124,6 +146,72 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState, mode }) => {
       solubilityYield
     };
   }, [soluteMass, totalSolventMass, activeSolvents, solventTotalWt, solidContent]);
+
+  /**
+   * Solubility per addition.
+   *
+   * After each mix -> centrifuge -> decant the insolubles leave with the
+   * pellet, so the measured solid content reflects dissolved solute against
+   * ALL solvent present:  SC = D / (D + S)  =>  D = SC*S / (100 - SC).
+   *
+   * "This addition" compares the rise in dissolved mass against the solute
+   * added since the previous measurement; "cumulative" is total dissolved
+   * against total solute charged. A falling per-addition figure means the
+   * solvent is approaching saturation.
+   */
+  const iterationResults = useMemo(() => {
+    if (soluteMass === undefined || totalSolventMass === undefined) return [];
+
+    const steps = [
+      { label: 'Base', soluteAdded: soluteMass, solventAdded: totalSolventMass, sc: solidContent },
+      ...iterations.map((it, i) => ({
+        label: `Addition ${i + 1}`,
+        soluteAdded: it.soluteAdded,
+        solventAdded: it.solventAdded,
+        sc: it.solidContent,
+      })),
+    ];
+
+    let cumulativeSolute = 0;
+    let cumulativeSolvent = 0;
+    // Dissolved mass and solute charge at the last step that was measured.
+    let lastDissolved = 0;
+    let lastSolute = 0;
+
+    return steps.map(step => {
+      cumulativeSolute += step.soluteAdded ?? 0;
+      cumulativeSolvent += step.solventAdded ?? 0;
+
+      const row = {
+        label: step.label,
+        soluteAdded: step.soluteAdded,
+        solventAdded: step.solventAdded,
+        sc: step.sc,
+        cumulativeSolute,
+        cumulativeSolvent,
+        dissolved: undefined as number | undefined,
+        stepSolubility: undefined as number | undefined,
+        cumulativeSolubility: undefined as number | undefined,
+      };
+
+      const measurable =
+        step.sc !== undefined && step.sc > 0 && step.sc < 100 && cumulativeSolvent > 0 && cumulativeSolute > 0;
+      if (!measurable) return row;
+
+      const dissolved = (step.sc! * cumulativeSolvent) / (100 - step.sc!);
+      row.dissolved = dissolved;
+      row.cumulativeSolubility = (dissolved / cumulativeSolute) * 100;
+
+      const soluteSinceLast = cumulativeSolute - lastSolute;
+      if (soluteSinceLast > 0) {
+        row.stepSolubility = ((dissolved - lastDissolved) / soluteSinceLast) * 100;
+      }
+
+      lastDissolved = dissolved;
+      lastSolute = cumulativeSolute;
+      return row;
+    });
+  }, [soluteMass, totalSolventMass, solidContent, iterations]);
 
   const getInputClass = (val: any, isManual: boolean = true) => {
     const base = "w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all font-bold text-slate-900 ";
@@ -272,6 +360,61 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState, mode }) => {
             </div>
           </section>
 
+          <section className="space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-bold text-slate-500 dark:text-sky-400 uppercase tracking-widest flex items-center gap-2">
+                <Layers className="w-4 h-4 text-sky-500" />
+                Iterative Additions
+              </h3>
+              <button
+                onClick={addIteration}
+                className="flex items-center gap-1 text-xs font-bold bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 hover:bg-sky-200 dark:hover:bg-sky-900/60 px-2.5 py-1.5 rounded-md transition-all active:scale-95"
+              >
+                <Plus className="w-3 h-3" /> Iteration
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Add more solute (and solvent, if any), re-measure solid content after
+              centrifuge &amp; decant, and solubility is reported for each addition.
+            </p>
+
+            {iterations.length > 0 && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1.5rem_1fr_1fr_1fr_1.75rem] gap-2 px-1">
+                  {['#', 'Solute +(g)', 'Solvent +(g)', 'Solid (%)', ''].map((h, i) => (
+                    <span key={i} className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{h}</span>
+                  ))}
+                </div>
+                {iterations.map((it, i) => (
+                  <div key={it.id} className="grid grid-cols-[1.5rem_1fr_1fr_1fr_1.75rem] gap-2 items-center">
+                    <span className="text-xs font-bold text-slate-400">{i + 1}</span>
+                    {(['soluteAdded', 'solventAdded', 'solidContent'] as const).map(field => (
+                      <input
+                        key={field}
+                        type="number"
+                        value={it[field] ?? ''}
+                        onWheel={preventScroll}
+                        onChange={e => updateIteration(it.id, field, handleNumInput(e.target.value))}
+                        placeholder="0.000"
+                        className={`w-full px-2 py-1.5 text-xs border rounded-md outline-none focus:ring-1 focus:ring-sky-500 text-right font-bold text-slate-900 ${
+                          it[field] === undefined ? 'bg-white border-slate-300 placeholder-slate-300' : 'bg-yellow-100 border-yellow-400'
+                        }`}
+                      />
+                    ))}
+                    <button
+                      onClick={() => removeIteration(it.id)}
+                      className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                      aria-label={`Remove iteration ${i + 1}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           <section className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Produced By</label>
@@ -389,6 +532,42 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState, mode }) => {
                       <span className="font-mono font-bold text-sky-400">{results.solubilityYield.toFixed(2)}%</span>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Per-addition solubility */}
+              {iterations.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-800 pb-1">
+                    Solubility By Addition
+                  </p>
+                  <div className="grid grid-cols-[4.5rem_1fr_1fr_1fr] gap-x-2 px-2 pb-1">
+                    {['Step', 'Cum. Solute', 'This Add', 'Cumulative'].map(h => (
+                      <span key={h} className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{h}</span>
+                    ))}
+                  </div>
+                  <div className="space-y-1">
+                    {iterationResults.map((row, i) => (
+                      <div
+                        key={i}
+                        className="grid grid-cols-[4.5rem_1fr_1fr_1fr] gap-x-2 items-center bg-slate-800/40 px-2 py-2 rounded-lg"
+                      >
+                        <span className="text-[11px] font-bold text-slate-300">{row.label}</span>
+                        <span className="text-[11px] font-mono text-slate-400">{row.cumulativeSolute.toFixed(3)}g</span>
+                        <span className={`text-[11px] font-mono font-bold ${row.stepSolubility === undefined ? 'text-slate-600' : 'text-sky-400'}`}>
+                          {row.stepSolubility === undefined ? '—' : `${row.stepSolubility.toFixed(2)}%`}
+                        </span>
+                        <span className={`text-[11px] font-mono ${row.cumulativeSolubility === undefined ? 'text-slate-600' : 'text-emerald-400'}`}>
+                          {row.cumulativeSolubility === undefined ? '—' : `${row.cumulativeSolubility.toFixed(2)}%`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed pt-1">
+                    A dash means that step has no usable solid-content measurement yet (or added no
+                    solute). A falling <span className="text-sky-400 font-bold">This Add</span> value
+                    indicates the solvent is approaching saturation.
+                  </p>
                 </div>
               )}
 

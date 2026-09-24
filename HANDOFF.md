@@ -3,7 +3,7 @@
 **To:** Michael Bell
 **From:** Aleksey Didenko
 **Repo:** https://github.com/ElectroninksInc/UTDInkFormulatorPro
-**Version:** v1.0.2
+**Version:** v1.0.3
 
 ## What this is
 
@@ -66,7 +66,7 @@ Written deliberately to stay inside the sandbox boundaries from your
 
 Replace the files in `websites/inkformulator/dist/`. The bind mount is live, so
 no container restart is needed — users may just need Ctrl+F5. Releases are
-tagged in the repo (`v1.0.2`), and `npm ci && npm run build` on Node 20+
+tagged in the repo (`v1.0.3`), and `npm ci && npm run build` on Node 20+
 reproduces `dist/` byte-for-byte if you ever want to verify the artifact.
 
 ## What I need back

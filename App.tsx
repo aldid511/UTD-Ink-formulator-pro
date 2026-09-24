@@ -102,6 +102,7 @@ const App: React.FC = () => {
       { id: '2', name: '', weightPercent: undefined, isAuto: true },
     ],
     solventSystem: 'IJ',
+    iterations: [],
     solidContent: undefined,
     lotNumber: '',
     chemicalName: '',

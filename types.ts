@@ -94,11 +94,24 @@ export interface QCSolidState {
   dryMass?: number;
 }
 
+/**
+ * One further addition of solute (and optionally solvent) to an existing ink,
+ * re-measured after mixing, centrifuging and decanting. Lets solubility be
+ * tracked per addition as the solvent approaches saturation.
+ */
+export interface SolubilityIteration {
+  id: string;
+  soluteAdded?: number;
+  solventAdded?: number;
+  solidContent?: number;
+}
+
 export interface SolubilityState {
   soluteMass?: number;
   totalSolventMass?: number;
   solvents: SolventComponent[];
   solventSystem: SolventSystemId;
+  iterations: SolubilityIteration[];
   solidContent?: number;
   lotNumber: string;
   chemicalName: string;

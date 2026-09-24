@@ -17,6 +17,11 @@ QC Solid is a pure measurement and is unaffected by the selector.
 and a concentration, and it returns the solvent to add and the ink you will end up
 with — for using up solute before it ages out.
 
+**Solubility** supports iterative additions: add solute (and solvent) to an existing
+ink, re-measure solid content after centrifuge & decant, and solubility is reported
+per addition as well as cumulatively. A falling per-addition figure means the solvent
+is approaching saturation.
+
 The app is a fully self-contained static site: no internet access needed at runtime
 (styling, fonts, and libraries are all bundled).
 

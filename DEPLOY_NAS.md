@@ -70,4 +70,4 @@ need a hard refresh (Ctrl+F5) to drop cached assets.
   all calculations run in the browser.
 - **Rebuilding from source**: `npm ci && npm run build` (Node 20+) regenerates
   `dist/`. Not needed for deployment — `dist/` in this repo is the release
-  build (tagged, e.g. `v1.0.2`).
+  build (tagged, e.g. `v1.0.3`).
