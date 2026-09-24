@@ -17,13 +17,23 @@ export interface FormulationResult {
 }
 
 export enum CalculationMode {
+  QC_SOLID = 'QC_SOLID',
+  STOCK = 'STOCK',
   ONE_POT = 'ONE_POT',
   DILUTION = 'DILUTION',
   CONCENTRATE_TO = 'CONCENTRATE_TO',
-  QC_SOLID = 'QC_SOLID',
   SOLVENT_CREATION = 'SOLVENT_CREATION',
   SOLUBILITY = 'SOLUBILITY'
 }
+
+/**
+ * Preset mode drives concentrations and solvent matrices from the standard UT
+ * Dots formulations; custom mode keeps the free-entry behaviour. Applies to
+ * every tab except QC Solid, which is a pure measurement.
+ */
+export type FormulationMode = 'PRESET' | 'CUSTOM';
+
+export type SolventSystemId = 'IJ' | 'TE';
 
 export interface OnePotState {
   soluteName: string;
@@ -31,11 +41,23 @@ export interface OnePotState {
   targetConcentration?: number;
   yieldPercent?: number;
   solvents: SolventComponent[];
+  solventSystem: SolventSystemId;
+}
+
+/** Stock: use up a fixed amount of solute on hand at a chosen concentration. */
+export interface StockState {
+  soluteName: string;
+  soluteOnHand?: number;
+  targetConcentration?: number;
+  yieldPercent?: number;
+  solvents: SolventComponent[];
+  solventSystem: SolventSystemId;
 }
 
 export interface SolventCreationState {
   totalTargetMass?: number;
   solvents: SolventComponent[];
+  solventSystem: SolventSystemId;
 }
 
 export interface DilutionState {
@@ -63,6 +85,7 @@ export interface ConcentrateToState {
   targetConcentration?: number;
   yieldPercent?: number;
   solvents: SolventComponent[];
+  solventSystem: SolventSystemId;
 }
 
 export interface QCSolidState {
@@ -75,6 +98,7 @@ export interface SolubilityState {
   soluteMass?: number;
   totalSolventMass?: number;
   solvents: SolventComponent[];
+  solventSystem: SolventSystemId;
   solidContent?: number;
   lotNumber: string;
   chemicalName: string;

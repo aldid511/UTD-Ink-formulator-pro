@@ -1,15 +1,19 @@
 
 import React, { useMemo } from 'react';
-import { SolventComponent, ConcentrateToState } from '../types';
+import { SolventComponent, ConcentrateToState, FormulationMode } from '../types';
+import { presetSolvents } from '../presets';
+import { SolventSystemPicker, ConcentrationPicker, InkNameBadge } from './PresetControls';
 import { Plus, Trash2, Calculator, AlertCircle, Droplet, Target, ArrowRight, Info, RefreshCw, Eraser, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   state: ConcentrateToState;
   setState: React.Dispatch<React.SetStateAction<ConcentrateToState>>;
+  mode: FormulationMode;
 }
 
-const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
-  const { initialMass, initialConcentration, targetMass, targetConcentration, yieldPercent, solvents } = state;
+const ConcentrateToCalculator: React.FC<Props> = ({ state, setState, mode }) => {
+  const { initialMass, initialConcentration, targetMass, targetConcentration, yieldPercent, solvents, solventSystem } = state;
+  const isPreset = mode === 'PRESET';
 
   const addSolvent = () => {
     setState(prev => ({
@@ -80,7 +84,12 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
     return base + "bg-white border-slate-400";
   };
 
-  const solventTotalWt = useMemo(() => solvents.reduce((sum, s) => sum + (s.weightPercent || 0), 0), [solvents]);
+  // In preset mode the matrix is fixed by the chosen solvent system.
+  const activeSolvents = isPreset ? presetSolvents(solventSystem) : solvents;
+  const solventTotalWt = useMemo(
+    () => activeSolvents.reduce((sum, s) => sum + (s.weightPercent || 0), 0),
+    [activeSolvents]
+  );
 
   const results = useMemo(() => {
     if (initialMass === undefined || initialConcentration === undefined || targetMass === undefined || targetConcentration === undefined || yieldPercent === undefined || solventTotalWt === 0) {
@@ -112,13 +121,13 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
     else if (solventToAdd < 0) error = "Insufficient mass growth for this concentration increase. Increase target mass or lower concentration.";
 
     const normalizationFactor = 100 / solventTotalWt;
-    const solventBreakdown = solvents.map((s, i) => ({
+    const solventBreakdown = activeSolvents.map((s, i) => ({
       name: s.name.trim() || String.fromCharCode(65 + i),
       mass: solventToAdd * (((s.weightPercent || 0) * normalizationFactor) / 100)
     }));
     const yieldLoss = yp < 100;
     return { isReady: true, activeToAdd, bulkToAdd, inactiveMass, solventToAdd, potMass, solventBreakdown, yieldLoss, error };
-  }, [initialMass, initialConcentration, targetMass, targetConcentration, yieldPercent, solvents, solventTotalWt]);
+  }, [initialMass, initialConcentration, targetMass, targetConcentration, yieldPercent, activeSolvents, solventTotalWt]);
 
   return (
     <div className="p-6 md:p-8 space-y-8 bg-white dark:bg-slate-800">
@@ -170,17 +179,26 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
                     className={getInputClass(targetMass)}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Conc (%)</label>
-                  <input
-                    type="number"
-                    value={targetConcentration ?? ''}
-                    onWheel={preventScroll}
-                    onChange={(e) => setState(prev => ({ ...prev, targetConcentration: handleNumInput(e.target.value) }))}
-                    placeholder="0.00"
-                    className={getInputClass(targetConcentration)}
+                {isPreset ? (
+                  <ConcentrationPicker
+                    value={targetConcentration}
+                    system={solventSystem}
+                    onChange={(v) => setState(prev => ({ ...prev, targetConcentration: v }))}
+                    label="Conc (%)"
                   />
-                </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Conc (%)</label>
+                    <input
+                      type="number"
+                      value={targetConcentration ?? ''}
+                      onWheel={preventScroll}
+                      onChange={(e) => setState(prev => ({ ...prev, targetConcentration: handleNumInput(e.target.value) }))}
+                      placeholder="0.00"
+                      className={getInputClass(targetConcentration)}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="col-span-2">
@@ -204,6 +222,13 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
             </div>
           </section>
 
+          {isPreset ? (
+            <SolventSystemPicker
+              value={solventSystem}
+              onChange={(v) => setState(prev => ({ ...prev, solventSystem: v }))}
+              title="Additional Solvent System"
+            />
+          ) : (
           <section className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800 dark:text-sky-400 flex items-center gap-2">
@@ -262,6 +287,7 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
               Recalculate Proportions
             </button>
           </section>
+          )}
         </div>
 
         <div className={`bg-slate-900 rounded-2xl p-6 text-white shadow-xl flex flex-col h-full min-h-[450px] ${results.isReady && !results.error ? 'print-full-page' : ''}`}>
@@ -282,6 +308,7 @@ const ConcentrateToCalculator: React.FC<Props> = ({ state, setState }) => {
             </div>
           ) : (
             <div className="space-y-6 flex-grow animate-in fade-in duration-500">
+              {isPreset && <InkNameBadge concentration={targetConcentration} system={solventSystem} />}
               <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
                 <div className="flex justify-between items-center">
                   <div>

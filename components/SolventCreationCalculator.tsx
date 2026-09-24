@@ -1,15 +1,19 @@
 
 import React, { useMemo } from 'react';
-import { SolventComponent, SolventCreationState } from '../types';
+import { SolventComponent, SolventCreationState, FormulationMode } from '../types';
+import { presetSolvents, SOLVENT_SYSTEMS } from '../presets';
+import { SolventSystemPicker } from './PresetControls';
 import { Plus, Trash2, Calculator, AlertCircle, Droplet, RefreshCw, Eraser, CheckCircle2, Zap } from 'lucide-react';
 
 interface Props {
   state: SolventCreationState;
   setState: React.Dispatch<React.SetStateAction<SolventCreationState>>;
+  mode: FormulationMode;
 }
 
-const SolventCreationCalculator: React.FC<Props> = ({ state, setState }) => {
-  const { totalTargetMass, solvents } = state;
+const SolventCreationCalculator: React.FC<Props> = ({ state, setState, mode }) => {
+  const { totalTargetMass, solvents, solventSystem } = state;
+  const isPreset = mode === 'PRESET';
 
   const addSolvent = () => {
     setState(prev => ({
@@ -73,18 +77,23 @@ const SolventCreationCalculator: React.FC<Props> = ({ state, setState }) => {
     return isNaN(parsed) ? undefined : parsed;
   };
 
-  const solventTotalWt = useMemo(() => solvents.reduce((sum, s) => sum + (s.weightPercent || 0), 0), [solvents]);
+  // In preset mode the blend is fixed by the chosen solvent system.
+  const activeSolvents = isPreset ? presetSolvents(solventSystem) : solvents;
+  const solventTotalWt = useMemo(
+    () => activeSolvents.reduce((sum, s) => sum + (s.weightPercent || 0), 0),
+    [activeSolvents]
+  );
 
   const recipe = useMemo(() => {
     if (totalTargetMass === undefined || totalTargetMass <= 0 || Math.abs(solventTotalWt - 100) > 0.01) {
       return null;
     }
-    return solvents.map((s, i) => ({
+    return activeSolvents.map((s, i) => ({
       name: s.name.trim() || `Component ${String.fromCharCode(65 + i)}`,
       mass: (totalTargetMass * (s.weightPercent || 0)) / 100,
       percent: s.weightPercent || 0
     }));
-  }, [totalTargetMass, solvents, solventTotalWt]);
+  }, [totalTargetMass, activeSolvents, solventTotalWt]);
 
   return (
     <div className="p-6 md:p-8 space-y-8 bg-white dark:bg-slate-800">
@@ -111,6 +120,13 @@ const SolventCreationCalculator: React.FC<Props> = ({ state, setState }) => {
             </div>
           </section>
 
+          {isPreset ? (
+            <SolventSystemPicker
+              value={solventSystem}
+              onChange={(v) => setState(prev => ({ ...prev, solventSystem: v }))}
+              title="Solvent System to Make"
+            />
+          ) : (
           <section className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800 dark:text-sky-400 flex items-center gap-2">
@@ -169,6 +185,7 @@ const SolventCreationCalculator: React.FC<Props> = ({ state, setState }) => {
               Fill Remainder
             </button>
           </section>
+          )}
         </div>
 
         <div className={`bg-slate-900 rounded-2xl p-6 text-white shadow-xl flex flex-col h-full min-h-[450px] ${recipe ? 'print-full-page' : ''}`}>
@@ -183,6 +200,12 @@ const SolventCreationCalculator: React.FC<Props> = ({ state, setState }) => {
             </div>
           ) : (
             <div className="space-y-6 flex-grow animate-in fade-in duration-300">
+              {isPreset && (
+                <div className="flex items-center justify-between px-4 py-3 bg-sky-900/30 border border-sky-700/50 rounded-xl">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Solvent System</span>
+                  <span className="text-xl font-bold font-mono text-sky-300">{SOLVENT_SYSTEMS[solventSystem].name}</span>
+                </div>
+              )}
               <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-3">Ingredients</p>
                 <div className="space-y-3">

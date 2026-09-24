@@ -5,7 +5,17 @@ All tabs model the one-pot process — **mix → centrifuge → decant** — whe
 fraction of the nano (default solubility 85%) is removed with the pellet, so recipes hit
 the requested final ink mass and concentration after decanting.
 
-**Tabs**: One Pot · Solvents · Dilution/Conc · Conc To · QC Solid · Solubility
+**Tabs**: QC Solid · Stock · One Pot · Solvents · Dilution/Conc · Conc To · Solubility
+
+**Preset / Custom** (selector in the header): preset mode drives concentrations and
+solvent matrices from the standard UT Dots formulations — solvent systems **IJ**
+(4:1 Longifolene : Eucalyptol) and **TE** (1:1 TEB : Eucalyptol), concentrations
+27% / 36% / 45%, named UTD25/UTD40/UTD60 per system. Custom mode keeps free entry.
+QC Solid is a pure measurement and is unaffected by the selector.
+
+**Stock** sizes a batch from the solute you already have: enter the amount on hand
+and a concentration, and it returns the solvent to add and the ink you will end up
+with — for using up solute before it ages out.
 
 The app is a fully self-contained static site: no internet access needed at runtime
 (styling, fonts, and libraries are all bundled).

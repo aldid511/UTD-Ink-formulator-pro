@@ -1,24 +1,29 @@
 
 import React, { useMemo } from 'react';
-import { SolventComponent, SolubilityState } from '../types';
+import { SolventComponent, SolubilityState, FormulationMode } from '../types';
+import { presetSolvents } from '../presets';
+import { SolventSystemPicker } from './PresetControls';
 import { Plus, Trash2, Calculator, Beaker, Droplet, RefreshCw, Eraser, FileText, Calendar, Tag, User, Hash, Zap } from 'lucide-react';
 
 interface Props {
   state: SolubilityState;
   setState: React.Dispatch<React.SetStateAction<SolubilityState>>;
+  mode: FormulationMode;
 }
 
-const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
-  const { 
-    soluteMass, 
-    totalSolventMass, 
-    solvents, 
-    solidContent, 
-    lotNumber, 
-    chemicalName, 
-    date, 
-    producedBy 
+const SolubilityCalculator: React.FC<Props> = ({ state, setState, mode }) => {
+  const {
+    soluteMass,
+    totalSolventMass,
+    solvents,
+    solventSystem,
+    solidContent,
+    lotNumber,
+    chemicalName,
+    date,
+    producedBy
   } = state;
+  const isPreset = mode === 'PRESET';
 
   const preventScroll = (e: React.WheelEvent<HTMLInputElement>) => {
     e.currentTarget.blur();
@@ -82,7 +87,12 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
     }
   };
 
-  const solventTotalWt = useMemo(() => solvents.reduce((sum, s) => sum + (s.weightPercent || 0), 0), [solvents]);
+  // In preset mode the matrix is fixed by the chosen solvent system.
+  const activeSolvents = isPreset ? presetSolvents(solventSystem) : solvents;
+  const solventTotalWt = useMemo(
+    () => activeSolvents.reduce((sum, s) => sum + (s.weightPercent || 0), 0),
+    [activeSolvents]
+  );
 
   const results = useMemo(() => {
     const isReady = soluteMass !== undefined && totalSolventMass !== undefined && solventTotalWt > 0;
@@ -92,12 +102,11 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
     const theoreticalSolidContent = (soluteMass / totalMass) * 100;
     
     const normalizationFactor = 100 / solventTotalWt;
-    const solventBreakdown = solvents.map((s, i) => ({
+    const solventBreakdown = activeSolvents.map((s, i) => ({
       name: s.name.trim() || `Solvent ${String.fromCharCode(65 + i)}`,
       mass: totalSolventMass * (((s.weightPercent || 0) * normalizationFactor) / 100),
       percent: (s.weightPercent || 0) * normalizationFactor
     }));
-
     // Back-calculate the soluble fraction from the measured solid content of the
     // decanted ink (post mix -> centrifuge -> decant, insolubles removed with pellet):
     //   measured SC = s*B / (s*B + S)   =>   s = SC*S / (B*(100 - SC))
@@ -114,7 +123,7 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
       deviation: solidContent !== undefined ? solidContent - theoreticalSolidContent : undefined,
       solubilityYield
     };
-  }, [soluteMass, totalSolventMass, solvents, solventTotalWt, solidContent]);
+  }, [soluteMass, totalSolventMass, activeSolvents, solventTotalWt, solidContent]);
 
   const getInputClass = (val: any, isManual: boolean = true) => {
     const base = "w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all font-bold text-slate-900 ";
@@ -185,12 +194,14 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
                 <Droplet className="w-4 h-4 text-sky-500" />
                 Solvent Matrix
               </h3>
-              <button
-                onClick={addSolvent}
-                className="text-xs font-bold bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 hover:bg-sky-200 dark:hover:bg-sky-900/60 px-2 py-1 rounded-md"
-              >
-                <Plus className="w-3 h-3" /> Add solvent
-              </button>
+              {!isPreset && (
+                <button
+                  onClick={addSolvent}
+                  className="text-xs font-bold bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 hover:bg-sky-200 dark:hover:bg-sky-900/60 px-2 py-1 rounded-md"
+                >
+                  <Plus className="w-3 h-3" /> Add solvent
+                </button>
+              )}
             </div>
 
             <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
@@ -205,7 +216,15 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
                     className={getInputClass(totalSolventMass)}
                   />
                </div>
-               
+
+               {isPreset ? (
+                 <SolventSystemPicker
+                   value={solventSystem}
+                   onChange={(v) => setState(prev => ({ ...prev, solventSystem: v }))}
+                   title="Solvent System"
+                 />
+               ) : (
+               <>
                <div className="space-y-2">
                 {solvents.map((s, i) => (
                   <div key={s.id} className="flex gap-2 items-center">
@@ -248,6 +267,8 @@ const SolubilityCalculator: React.FC<Props> = ({ state, setState }) => {
                     Auto-Fill Proportions
                   </button>
               </div>
+              </>
+              )}
             </div>
           </section>
 

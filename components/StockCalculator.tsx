@@ -1,18 +1,17 @@
-
 import React, { useMemo } from 'react';
-import { SolventComponent, OnePotState, FormulationMode } from '../types';
+import { SolventComponent, StockState, FormulationMode } from '../types';
 import { presetSolvents, getInkName } from '../presets';
 import { SolventSystemPicker, ConcentrationPicker, InkNameBadge } from './PresetControls';
-import { Plus, Trash2, Calculator, AlertCircle, Droplet, RefreshCw, Eraser, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Calculator, AlertCircle, Droplet, RefreshCw, Eraser, Package } from 'lucide-react';
 
 interface Props {
-  state: OnePotState;
-  setState: React.Dispatch<React.SetStateAction<OnePotState>>;
+  state: StockState;
+  setState: React.Dispatch<React.SetStateAction<StockState>>;
   mode: FormulationMode;
 }
 
-const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
-  const { soluteName, targetMass, targetConcentration, yieldPercent, solvents, solventSystem } = state;
+const StockCalculator: React.FC<Props> = ({ state, setState, mode }) => {
+  const { soluteName, soluteOnHand, targetConcentration, yieldPercent, solvents, solventSystem } = state;
   const isPreset = mode === 'PRESET';
 
   const addSolvent = () => {
@@ -24,10 +23,7 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
 
   const removeSolvent = (id: string) => {
     if (solvents.length <= 1) return;
-    setState(prev => ({
-      ...prev,
-      solvents: prev.solvents.filter(s => s.id !== id)
-    }));
+    setState(prev => ({ ...prev, solvents: prev.solvents.filter(s => s.id !== id) }));
   };
 
   const clearSolventValue = (id: string) => {
@@ -40,10 +36,10 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
   const updateSolvent = (id: string, field: keyof SolventComponent, value: any) => {
     setState(prev => ({
       ...prev,
-      solvents: prev.solvents.map(s => (s.id === id ? { 
-        ...s, 
-        [field]: value, 
-        isAuto: field === 'weightPercent' ? (value === undefined) : s.isAuto 
+      solvents: prev.solvents.map(s => (s.id === id ? {
+        ...s,
+        [field]: value,
+        isAuto: field === 'weightPercent' ? (value === undefined) : s.isAuto
       } : s))
     }));
   };
@@ -51,36 +47,28 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
   const calculateMatrix = () => {
     const manualTotal = solvents.reduce((sum, s) => sum + (!s.isAuto && s.weightPercent !== undefined ? s.weightPercent : 0), 0);
     const autoFields = solvents.filter(s => s.isAuto || s.weightPercent === undefined);
-    
     if (autoFields.length > 0) {
       const remaining = Math.max(0, 100 - manualTotal);
       const splitValue = parseFloat((remaining / autoFields.length).toFixed(4));
-      
       setState(prev => ({
         ...prev,
-        solvents: prev.solvents.map(s => {
-          if (s.isAuto || s.weightPercent === undefined) {
-            return { ...s, weightPercent: splitValue, isAuto: true };
-          }
-          return s;
-        })
+        solvents: prev.solvents.map(s =>
+          (s.isAuto || s.weightPercent === undefined) ? { ...s, weightPercent: splitValue, isAuto: true } : s
+        )
       }));
     }
   };
 
-  const preventScroll = (e: React.WheelEvent<HTMLInputElement>) => {
-    e.currentTarget.blur();
-  };
+  const preventScroll = (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur();
 
   const handleNumInput = (val: string) => {
     const parsed = parseFloat(val);
     return isNaN(parsed) ? undefined : parsed;
   };
 
-  const getInputClass = (val: number | undefined, isAuto?: boolean) => {
+  const getInputClass = (val: number | undefined) => {
     const base = "w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all font-bold text-slate-900 ";
     if (val === undefined) return base + "bg-white border-slate-300 text-slate-400 placeholder-slate-300 focus:ring-sky-500";
-    if (isAuto) return base + "bg-emerald-50 border-emerald-200 text-emerald-700 italic";
     return base + "bg-white border-slate-400 focus:ring-sky-500";
   };
 
@@ -92,33 +80,37 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
   );
 
   const results = useMemo(() => {
-    if (targetMass === undefined || targetConcentration === undefined || yieldPercent === undefined || solventTotalWt === 0) {
+    if (soluteOnHand === undefined || targetConcentration === undefined || yieldPercent === undefined || solventTotalWt === 0) {
       return { isReady: false as const };
     }
     let error: string | null = null;
-    if (targetMass <= 0) error = "Target mass must be greater than 0.";
+    if (soluteOnHand <= 0) error = "Solute on hand must be greater than 0.";
     else if (yieldPercent <= 0 || yieldPercent > 100) error = "Solubility must be between 0 and 100%.";
-    else if (targetConcentration < 0 || targetConcentration >= 100) error = "Concentration must be between 0 and 100%.";
+    else if (targetConcentration <= 0 || targetConcentration >= 100) error = "Concentration must be between 0 and 100%.";
     if (error) return { isReady: true as const, error };
 
-    const concentrationDecimal = targetConcentration / 100;
-    const activeSoluteNeeded = targetMass * concentrationDecimal;
-    const bulkSoluteNeeded = activeSoluteNeeded / (yieldPercent / 100);
-    const inactiveMass = bulkSoluteNeeded - activeSoluteNeeded;
-    // Process mass balance (SOP F056: mix -> centrifuge -> decant):
-    // the insoluble fraction of the bulk solid leaves with the pellet at
-    // centrifugation, so the decanted ink = dissolved solute + all solvent.
-    // Solvent therefore tops up the FINAL ink mass, not the pot charge.
-    const totalSolventMass = targetMass - activeSoluteNeeded;
-    const potMass = bulkSoluteNeeded + totalSolventMass;
+    // All of the solute on hand goes in the pot. Only its soluble fraction
+    // survives centrifuge/decant, so that dissolved mass sets the ink size.
+    const dissolved = soluteOnHand * (yieldPercent / 100);
+    const insoluble = soluteOnHand - dissolved;
+    const finalInkMass = dissolved / (targetConcentration / 100);
+    const totalSolventMass = finalInkMass - dissolved;
+    const potMass = soluteOnHand + totalSolventMass;
+
     const normalizationFactor = 100 / solventTotalWt;
     const solventBreakdown = activeSolvents.map((s, i) => ({
       name: s.name.trim() || String.fromCharCode(65 + i),
       mass: totalSolventMass * (((s.weightPercent || 0) * normalizationFactor) / 100)
     }));
-    const yieldLoss = yieldPercent < 100;
-    return { isReady: true as const, error: null, activeSoluteNeeded, bulkSoluteNeeded, inactiveMass, totalSolventMass, potMass, solventBreakdown, yieldLoss };
-  }, [targetMass, targetConcentration, yieldPercent, activeSolvents, solventTotalWt]);
+
+    return {
+      isReady: true as const, error: null,
+      dissolved, insoluble, finalInkMass, totalSolventMass, potMass, solventBreakdown,
+      yieldLoss: yieldPercent < 100
+    };
+  }, [soluteOnHand, targetConcentration, yieldPercent, activeSolvents, solventTotalWt]);
+
+  const inkName = isPreset ? getInkName(targetConcentration, solventSystem) : undefined;
 
   return (
     <div className="p-6 md:p-8 space-y-8 bg-white dark:bg-slate-800">
@@ -126,10 +118,10 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
         <div className="space-y-6 print:hidden">
           <section className="space-y-4">
             <h3 className="text-lg font-bold text-slate-800 dark:text-sky-400 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-sky-500" />
-              Primary Parameters
+              <Package className="w-5 h-5 text-sky-500" />
+              Solute On Hand
             </h3>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Solute Name</label>
@@ -141,14 +133,14 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Target Mass (g)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Solute On Hand (g)</label>
                 <input
                   type="number"
-                  value={targetMass ?? ''}
+                  value={soluteOnHand ?? ''}
                   onWheel={preventScroll}
-                  onChange={(e) => setState(prev => ({ ...prev, targetMass: handleNumInput(e.target.value) }))}
+                  onChange={(e) => setState(prev => ({ ...prev, soluteOnHand: handleNumInput(e.target.value) }))}
                   placeholder="0.00"
-                  className={getInputClass(targetMass)}
+                  className={getInputClass(soluteOnHand)}
                 />
               </div>
               {isPreset ? (
@@ -170,7 +162,7 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
                   />
                 </div>
               )}
-              <div>
+              <div className="col-span-2">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Solubility / Yield (%)</label>
                 <input
                   type="number"
@@ -182,12 +174,12 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
                 />
               </div>
             </div>
+
             <div className="flex gap-2 items-start p-3 bg-sky-50 dark:bg-sky-900/10 border border-sky-100 dark:border-sky-800 rounded-lg">
               <AlertCircle className="w-4 h-4 text-sky-500 mt-0.5 shrink-0" />
               <p className="text-xs text-sky-800 dark:text-sky-300">
-                One-pot process per SOP F056: mix &rarr; centrifuge &rarr; decant. The insoluble fraction
-                of the nano is removed with the pellet, so the decanted ink hits your target mass and
-                concentration.
+                Consumes <strong>all</strong> the solute on hand. The batch size is whatever that
+                amount yields at the chosen concentration after mix &rarr; centrifuge &rarr; decant.
               </p>
             </div>
           </section>
@@ -198,58 +190,57 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
               onChange={(v) => setState(prev => ({ ...prev, solventSystem: v }))}
             />
           ) : (
-          <section className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-800 dark:text-sky-400 flex items-center gap-2">
-                <Droplet className="w-5 h-5 text-sky-500" />
-                Solvent Matrix (wt%)
-              </h3>
-              <button
-                onClick={addSolvent}
-                className="text-xs font-bold bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 hover:bg-sky-200 dark:hover:bg-sky-900/60 px-2 py-1 rounded-md"
-              >
-                <Plus className="w-3 h-3" /> Add Solvent
-              </button>
-            </div>
+            <section className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-sky-400 flex items-center gap-2">
+                  <Droplet className="w-5 h-5 text-sky-500" />
+                  Solvent Matrix (wt%)
+                </h3>
+                <button
+                  onClick={addSolvent}
+                  className="text-xs font-bold bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 hover:bg-sky-200 dark:hover:bg-sky-900/60 px-2 py-1 rounded-md"
+                >
+                  <Plus className="w-3 h-3" /> Add Solvent
+                </button>
+              </div>
 
-            <div className="space-y-2">
-              {solvents.map((s, i) => (
-                <div key={s.id} className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={s.name}
-                    onChange={(e) => updateSolvent(s.id, 'name', e.target.value)}
-                    className="flex-grow px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-md outline-none focus:ring-1 focus:ring-sky-500 text-slate-900 font-bold"
-                    placeholder={`Solvent ${String.fromCharCode(65 + i)}`}
-                  />
-                  <div className="relative w-28">
+              <div className="space-y-2">
+                {solvents.map((s, i) => (
+                  <div key={s.id} className="flex gap-2 items-center">
                     <input
-                      type="number"
-                      value={s.weightPercent ?? ''}
-                      onWheel={preventScroll}
-                      onFocus={() => { if (s.isAuto) clearSolventValue(s.id); }}
-                      onChange={(e) => updateSolvent(s.id, 'weightPercent', handleNumInput(e.target.value))}
-                      placeholder="0.0"
-                      className={`w-full pl-3 pr-7 py-1.5 text-sm border rounded-md outline-none focus:ring-1 focus:ring-sky-500 text-right transition-colors bg-white text-slate-900 font-bold ${
-                        s.weightPercent === undefined ? 'text-slate-400' : s.isAuto ? 'text-emerald-600 italic' : ''
-                      }`}
+                      type="text"
+                      value={s.name}
+                      onChange={(e) => updateSolvent(s.id, 'name', e.target.value)}
+                      className="flex-grow px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-md outline-none focus:ring-1 focus:ring-sky-500 text-slate-900 font-bold"
+                      placeholder={`Solvent ${String.fromCharCode(65 + i)}`}
                     />
-                    <span className="absolute right-2 top-1.5 text-slate-400 text-sm">%</span>
+                    <div className="relative w-28">
+                      <input
+                        type="number"
+                        value={s.weightPercent ?? ''}
+                        onWheel={preventScroll}
+                        onFocus={() => { if (s.isAuto) clearSolventValue(s.id); }}
+                        onChange={(e) => updateSolvent(s.id, 'weightPercent', handleNumInput(e.target.value))}
+                        placeholder="0.0"
+                        className={`w-full pl-3 pr-7 py-1.5 text-sm border rounded-md outline-none focus:ring-1 focus:ring-sky-500 text-right transition-colors bg-white text-slate-900 font-bold ${
+                          s.weightPercent === undefined ? 'text-slate-400' : s.isAuto ? 'text-emerald-600 italic' : ''
+                        }`}
+                      />
+                      <span className="absolute right-2 top-1.5 text-slate-400 text-sm">%</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => clearSolventValue(s.id)} className="p-1.5 text-slate-400 hover:text-sky-500 transition-colors">
+                        <Eraser className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => removeSolvent(s.id)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => clearSolventValue(s.id)} className="p-1.5 text-slate-400 hover:text-sky-500 transition-colors">
-                      <Eraser className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => removeSolvent(s.id)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            <div className="flex flex-col gap-4 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Matrix</span>
                   <span className={`text-sm font-bold ${Math.abs(solventTotalWt - 100) < 0.01 ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -264,21 +255,20 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
                   Fill Remainder
                 </button>
               </div>
-            </div>
-          </section>
+            </section>
           )}
         </div>
 
         <div className={`bg-slate-900 rounded-2xl p-6 text-white shadow-inner flex flex-col h-full min-h-[400px] ${results.isReady && !results.error ? 'print-full-page' : ''}`}>
           <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
-            <span className="bg-sky-600 p-2 rounded-lg print:hidden"><Calculator className="w-5 h-5" /></span>
-            Recipe Card
+            <span className="bg-sky-600 p-2 rounded-lg print:hidden"><Package className="w-5 h-5" /></span>
+            Stock Recipe Card
           </h3>
-          
+
           {!results.isReady ? (
             <div className="flex-grow flex flex-col items-center justify-center text-slate-500 space-y-4 border-2 border-dashed border-slate-800 rounded-2xl p-8 text-center">
               <Calculator className="w-12 h-12 opacity-20" />
-              <p className="text-sm font-medium">Input recipe parameters</p>
+              <p className="text-sm font-medium">Enter the solute you have on hand</p>
             </div>
           ) : results.error ? (
             <div className="bg-red-900/30 border border-red-500/50 p-4 rounded-xl text-red-200 text-sm flex gap-3">
@@ -287,35 +277,39 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
             </div>
           ) : (
             <div className="space-y-6 flex-grow animate-in fade-in duration-500">
-              {isPreset && <InkNameBadge concentration={targetConcentration} system={solventSystem} />}
+              {inkName && <InkNameBadge concentration={targetConcentration} system={solventSystem} />}
+
               <div>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Solute Addition</p>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Solute Charge (all of it)</p>
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
                   <div className="flex justify-between items-center">
                     <div>
                       <h4 className="font-semibold">{soluteName}</h4>
-                      <p className="text-xs text-slate-400">Bulk Mass to Weigh Out</p>
+                      <p className="text-xs text-slate-400">Bulk Mass On Hand</p>
                     </div>
                     <div className="text-2xl font-mono font-bold text-sky-400">
-                      {results.bulkSoluteNeeded?.toFixed(3)}g
+                      {soluteOnHand?.toFixed(3)}g
                     </div>
                   </div>
                   {results.yieldLoss && (
                     <div className="mt-3 pt-3 border-t border-slate-700 grid grid-cols-2 gap-2 text-xs">
                       <div className="text-slate-400">
                         <span className="block text-[10px] uppercase tracking-widest font-bold mb-0.5">Dissolves (Soluble)</span>
-                        <span className="font-mono text-emerald-400">{results.activeSoluteNeeded?.toFixed(3)}g</span>
+                        <span className="font-mono text-emerald-400">{results.dissolved?.toFixed(3)}g</span>
                       </div>
                       <div className="text-slate-400">
                         <span className="block text-[10px] uppercase tracking-widest font-bold mb-0.5">Insoluble (Removed)</span>
-                        <span className="font-mono text-amber-400">{results.inactiveMass?.toFixed(3)}g</span>
+                        <span className="font-mono text-amber-400">{results.insoluble?.toFixed(3)}g</span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
+
               <div>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Solvent System</p>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">
+                  Solvent To Add — {results.totalSolventMass?.toFixed(3)}g
+                </p>
                 <div className="space-y-2">
                   {results.solventBreakdown?.map((s, idx) => (
                     <div key={idx} className="flex justify-between items-center px-4 py-3 bg-slate-800 rounded-lg border border-slate-700">
@@ -325,6 +319,7 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
                   ))}
                 </div>
               </div>
+
               <div>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Process Mass Balance</p>
                 <div className="bg-slate-800 rounded-xl border border-slate-700 divide-y divide-slate-700/60 text-sm">
@@ -334,18 +329,21 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
                   </div>
                   <div className="flex justify-between items-center px-4 py-2.5">
                     <span className="text-slate-400">2. Centrifuge &amp; decant (insoluble out)</span>
-                    <span className="font-mono text-amber-400">&minus;{results.inactiveMass?.toFixed(3)}g</span>
+                    <span className="font-mono text-amber-400">&minus;{results.insoluble?.toFixed(3)}g</span>
                   </div>
                   <div className="flex justify-between items-center px-4 py-2.5">
                     <span className="text-slate-300 font-semibold">3. Final decanted ink</span>
-                    <span className="font-mono text-emerald-400 font-bold">{targetMass?.toFixed(3)}g @ {targetConcentration?.toFixed(2)}%</span>
+                    <span className="font-mono text-emerald-400 font-bold">
+                      {results.finalInkMass?.toFixed(3)}g @ {targetConcentration?.toFixed(2)}%
+                    </span>
                   </div>
                 </div>
               </div>
+
               <div className="pt-4 border-t border-slate-800 flex justify-between items-end mt-auto">
                 <div>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Final Ink Mass</p>
-                  <p className="text-lg font-semibold">{targetMass?.toFixed(2)}g</p>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Ink Yield</p>
+                  <p className="text-lg font-semibold">{results.finalInkMass?.toFixed(2)}g</p>
                 </div>
                 <div className="text-right">
                   <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Final Conc</p>
@@ -370,4 +368,4 @@ const OnePotCalculator: React.FC<Props> = ({ state, setState, mode }) => {
   );
 };
 
-export default OnePotCalculator;
+export default StockCalculator;

@@ -1,14 +1,17 @@
 
 import React, { useMemo } from 'react';
-import { DilutionState } from '../types';
+import { DilutionState, FormulationMode } from '../types';
+import { PRESET_CONCENTRATIONS } from '../presets';
 import { FlaskConical, Plus, Beaker, Info, ArrowRight, Target, RefreshCw, AlertCircle, Layers } from 'lucide-react';
 
 interface Props {
   state: DilutionState;
   setState: React.Dispatch<React.SetStateAction<DilutionState>>;
+  mode: FormulationMode;
 }
 
-const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
+const DilutionCalculator: React.FC<Props> = ({ state, setState, mode }) => {
+  const isPreset = mode === 'PRESET';
   const { 
     calcMode,
     initialMass, 
@@ -40,6 +43,24 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
     if (isManual) return base + "bg-yellow-100 border-yellow-400 text-slate-900 focus:ring-yellow-500";
     return base + "bg-emerald-100 border-emerald-400 text-slate-900 focus:ring-emerald-500";
   };
+
+  // Preset mode: the goal is one of the standard ink concentrations. Measured
+  // values (stock concentration, masses) stay free entry in both modes.
+  const goalConcSelect = (
+    <select
+      value={state.targetConcentration ?? ''}
+      onChange={(e) => setState(prev => ({
+        ...prev,
+        targetConcentration: e.target.value === '' ? undefined : parseFloat(e.target.value)
+      }))}
+      className={getInputClass(state.targetConcentration, true)}
+    >
+      <option value="">Select…</option>
+      {PRESET_CONCENTRATIONS.map(c => (
+        <option key={c} value={c}>{c}%</option>
+      ))}
+    </select>
+  );
 
   const results = useMemo(() => {
     const isBasicReady = initialMass !== undefined && initialConcentration !== undefined;
@@ -256,6 +277,7 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Goal Conc (%)</label>
+                    {isPreset ? goalConcSelect : (
                     <input
                       type="number"
                       value={targetConcentration ?? ''}
@@ -264,6 +286,7 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
                       placeholder="0.00"
                       className={getInputClass(targetConcentration, true)}
                     />
+                    )}
                   </div>
                 </div>
               ) : calcMode === 'FORWARD' ? (
@@ -330,6 +353,7 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Goal Concentration (%)</label>
+                    {isPreset ? goalConcSelect : (
                     <input
                       type="number"
                       value={targetConcentration ?? ''}
@@ -338,6 +362,7 @@ const DilutionCalculator: React.FC<Props> = ({ state, setState }) => {
                       placeholder="0.00"
                       className={getInputClass(targetConcentration, true)}
                     />
+                    )}
                   </div>
                   <div className="h-px bg-slate-200 dark:bg-slate-700"></div>
                   {adjustMode === 'ADD_SOLID' ? (
